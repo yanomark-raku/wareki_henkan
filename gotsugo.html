@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日程調整テキストメーカー</title>
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text-main: #334155;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 8px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+
+    header p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      border: 1px solid var(--border);
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: var(--text-main);
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    /* カレンダー部分 */
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .calendar-header button {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 12px;
+      cursor: pointer;
+      color: var(--text-main);
+      font-weight: bold;
+      transition: background-color 0.2s;
+    }
+    
+    .calendar-header button:hover {
+      background: var(--bg);
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      text-align: center;
+    }
+
+    .calendar-grid.days {
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .date-cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.1s;
+      background-color: var(--surface);
+      border: 1px solid transparent;
+    }
+
+    .date-cell:not(.empty) {
+      border-color: var(--border);
+    }
+
+    .date-cell:not(.empty):hover {
+      background-color: #eff6ff;
+      border-color: var(--primary);
+      color: var(--primary);
+      font-weight: bold;
+    }
+
+    .date-cell:not(.empty):active {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .date-cell.empty {
+      cursor: default;
+    }
+
+    /* 時間帯部分 */
+    .time-card {
+      margin-top: 20px;
+    }
+
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 8px;
+    }
+
+    .time-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: var(--text-main);
+      transition: all 0.1s;
+      text-align: center;
+    }
+
+    .time-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background-color: #eff6ff;
+    }
+
+    .time-btn:active {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    /* 汎用的な時間指定ボタン（午前・午後など） */
+    .generic-times {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .generic-times .time-btn {
+      flex: 1;
+      background-color: #f8fafc;
+    }
+
+    /* テキストエリア部分 */
+    .output-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    textarea {
+      flex-grow: 1;
+      width: 100%;
+      min-height: 400px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+      box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    }
+
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: #e2e8f0;
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background-color: #cbd5e1;
+    }
+
+    /* 通知用トースト */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #10b981;
+      color: white;
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-weight: bold;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+    #toast.show {
+      opacity: 1;
+      visibility: visible;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>日程調整テキストメーカー</h1>
+    <p>日付と時間をクリックすると、右のテキストに直接入力されます。</p>
+  </header>
+
+  <div class="main-layout">
+    <!-- 左側：操作パネル -->
+    <div class="controls-panel">
+      
+      <!-- カレンダー -->
+      <div class="card calendar-card">
+        <h2>1. 日付を入力</h2>
+        <div class="calendar-header">
+          <button id="prevMonth">&lt; 前月</button>
+          <span id="currentMonthYear" style="font-weight: bold;"></span>
+          <button id="nextMonth">次月 &gt;</button>
+        </div>
+        <div class="calendar-grid days">
+          <span style="color: #ef4444;">日</span>
+          <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span>
+          <span style="color: #3b82f6;">土</span>
+        </div>
+        <div class="calendar-grid dates" id="calendarDates"></div>
+      </div>
+
+      <!-- 時間帯 -->
+      <div class="card time-card">
+        <h2>2. 時間を入力</h2>
+        <div class="time-grid" id="timeGrid">
+          <!-- JSで生成（9:30〜17:00） -->
+        </div>
+        <div class="generic-times" id="genericTimeGrid">
+          <!-- JSで生成（午前・午後など） -->
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 12px;">
+          ※時間をクリックすると「開始時間〜」が入力され、もう一度クリックすると「終了時間」が入力されます。
+        </p>
+      </div>
+
+    </div>
+
+    <!-- 右側：テキスト出力パネル -->
+    <div class="output-panel">
+      <textarea id="outputText"></textarea>
+      <div class="actions">
+        <button id="copyBtn" class="btn btn-primary">テキストをコピー</button>
+        <button id="resetBtn" class="btn btn-secondary">リセット</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast">コピーしました！</div>
+
+<script>
+  // --- 初期データと定数 ---
+  const defaultText = `以下の日程でご都合いかがでしょうか\n`;
+
+  // 9:30〜17:00までの配列
+  const timeOptions = [
+    "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00",
+    "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
+  ];
+
+  const genericTimeOptions = ["午前なら可能", "午後なら可能", "終日可能"];
+  const daysOfWeek = ['日', '月', '火', '水', '木', '金', '土'];
+
+  // --- 状態管理 ---
+  let currentDate = new Date();
+  let isStartTime = true; // 次に入力する時間が「開始時間(〜をつける)」かどうか
+
+  // --- DOM要素 ---
+  const elMonthYear = document.getElementById('currentMonthYear');
+  const elCalendarDates = document.getElementById('calendarDates');
+  const elTimeGrid = document.getElementById('timeGrid');
+  const elGenericTimeGrid = document.getElementById('genericTimeGrid');
+  const elOutputText = document.getElementById('outputText');
+  const btnPrev = document.getElementById('prevMonth');
+  const btnNext = document.getElementById('nextMonth');
+  const btnCopy = document.getElementById('copyBtn');
+  const btnReset = document.getElementById('resetBtn');
+  const elToast = document.getElementById('toast');
+
+  // --- 初期化 ---
+  function init() {
+    elOutputText.value = defaultText;
+    renderCalendar(currentDate);
+    renderTimeButtons();
+    
+    btnPrev.addEventListener('click', () => {
+      currentDate.setMonth(currentDate.getMonth() - 1);
+      renderCalendar(currentDate);
+    });
+    
+    btnNext.addEventListener('click', () => {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      renderCalendar(currentDate);
+    });
+
+    btnCopy.addEventListener('click', copyText);
+    btnReset.addEventListener('click', resetAll);
+    
+    // カーソルを末尾に合わせてフォーカス
+    elOutputText.focus();
+    elOutputText.selectionStart = elOutputText.value.length;
+  }
+
+  // --- カレンダー描画 ---
+  function renderCalendar(date) {
+    elCalendarDates.innerHTML = '';
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    elMonthYear.textContent = `${year}年 ${month + 1}月`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // 空白セル
+    for (let i = 0; i < firstDay; i++) {
+      const emptyCell = document.createElement('div');
+      emptyCell.className = 'date-cell empty';
+      elCalendarDates.appendChild(emptyCell);
+    }
+
+    // 日付セル
+    for (let i = 1; i <= daysInMonth; i++) {
+      const cellDate = new Date(year, month, i);
+      const cell = document.createElement('div');
+      cell.className = 'date-cell';
+      cell.textContent = i;
+      
+      if (cellDate.getDay() === 0) cell.style.color = '#ef4444'; 
+      if (cellDate.getDay() === 6) cell.style.color = '#3b82f6'; 
+
+      // クリックでテキストエリアに入力
+      cell.addEventListener('click', () => insertDateText(cellDate));
+      elCalendarDates.appendChild(cell);
+    }
+  }
+
+  // --- 時間帯ボタンの描画 ---
+  function renderTimeButtons() {
+    // 通常の時間（9:30〜17:00）
+    timeOptions.forEach(time => {
+      const btn = document.createElement('button');
+      btn.className = 'time-btn';
+      btn.textContent = time;
+      btn.addEventListener('click', () => insertTimeText(time, false));
+      elTimeGrid.appendChild(btn);
+    });
+
+    // 午前・午後などの汎用ボタン
+    genericTimeOptions.forEach(time => {
+      const btn = document.createElement('button');
+      btn.className = 'time-btn';
+      btn.textContent = time;
+      btn.addEventListener('click', () => insertTimeText(time, true));
+      elGenericTimeGrid.appendChild(btn);
+    });
+  }
+
+  // --- テキスト挿入ロジック（キャレット位置に挿入） ---
+  function insertAtCursor(text) {
+    const field = elOutputText;
+    const startPos = field.selectionStart;
+    const endPos = field.selectionEnd;
+    
+    field.value = field.value.substring(0, startPos) + text + field.value.substring(endPos, field.value.length);
+    
+    // カーソル位置を挿入したテキストの直後に移動
+    field.selectionStart = startPos + text.length;
+    field.selectionEnd = startPos + text.length;
+    field.focus();
+  }
+
+  // --- 日付の入力 ---
+  function insertDateText(date) {
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    const w = daysOfWeek[date.getDay()];
+    
+    // 改行して日付を入力
+    insertAtCursor(`\n・${m}月${d}日(${w}) `);
+    
+    // 日付が入力されたら、次は必ず「開始時間」になるようにリセット
+    isStartTime = true;
+  }
+
+  // --- 時間の入力 ---
+  function insertTimeText(timeStr, isGeneric) {
+    if (isGeneric) {
+      // 「午前なら可能」等の場合はそのまま入力して、フラグをリセット
+      insertAtCursor(timeStr);
+      isStartTime = true;
+    } else {
+      // 1回目か2回目で挙動を変える
+      if (isStartTime) {
+        insertAtCursor(timeStr + "〜");
+        isStartTime = false; // 次は終了時間
+      } else {
+        insertAtCursor(timeStr);
+        isStartTime = true; // 終了時間が入力されたのでリセット
+      }
+    }
+  }
+
+  // --- コピー機能 ---
+  function copyText() {
+    elOutputText.select();
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(elOutputText.value).then(showToast);
+    } else {
+      document.execCommand('copy');
+      showToast();
+    }
+    // 選択を解除して末尾にフォーカスを戻す
+    elOutputText.selectionStart = elOutputText.value.length;
+    elOutputText.focus();
+  }
+
+  // --- リセット機能 ---
+  function resetAll() {
+    if(confirm('テキストを初期状態に戻しますか？')) {
+      elOutputText.value = defaultText;
+      isStartTime = true;
+      elOutputText.focus();
+      elOutputText.selectionStart = elOutputText.value.length;
+    }
+  }
+
+  // --- トースト通知 ---
+  function showToast() {
+    elToast.classList.add('show');
+    setTimeout(() => {
+      elToast.classList.remove('show');
+    }, 2000);
+  }
+
+  // 実行
+  init();
+
+</script>
+</body>
+</html>
