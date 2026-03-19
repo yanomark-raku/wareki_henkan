@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>和暦⇄西暦 変換（昭和・平成・令和）</title>
+  <style>
+    :root{
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-weak: rgba(37,99,235,.12);
+      --danger: #dc2626;
+      --shadow: 0 10px 30px rgba(2, 6, 23, .08);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --focus: 0 0 0 4px rgba(37,99,235,.18);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", Arial, sans-serif;
+    }
+
+    *{ box-sizing: border-box; }
+    html, body{ height: 100%; }
+    body{
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.10), transparent 60%),
+        radial-gradient(900px 500px at 90% 0%, rgba(16,185,129,.10), transparent 55%),
+        var(--bg);
+    }
+
+    .wrap{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 16px 40px;
+    }
+
+    header{
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .title{
+      display: grid;
+      gap: 6px;
+    }
+    .title h1{
+      font-size: 20px;
+      margin: 0;
+      letter-spacing: .02em;
+    }
+    .title p{
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .badge{
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.7);
+      padding: 10px 12px;
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+
+    .grid{
+      display: grid;
+      gap: 14px;
+    }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .cardHead{
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.75));
+    }
+
+    .cardHead .label{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .pill{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--primary-weak);
+      color: #1d4ed8;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: .02em;
+      flex: 0 0 auto;
+    }
+
+    .cardHead h2{
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: .01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cardBody{
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .row{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 720px){
+      header{ flex-direction: column; }
+      .badge{ width: fit-content; }
+      .row{ grid-template-columns: 1fr; }
+    }
+
+    .field{
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label{
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    input[type="number"], select{
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: box-shadow .15s ease, border-color .15s ease, transform .05s ease;
+    }
+
+    input[type="number"]:focus, select:focus{
+      border-color: rgba(37,99,235,.55);
+      box-shadow: var(--focus);
+    }
+
+    .actions{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+      margin-top: 2px;
+    }
+
+    button{
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .05s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+    }
+    button:active{ transform: translateY(1px); }
+
+    .primary{
+      background: var(--primary);
+      border-color: rgba(37,99,235,.9);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(37,99,235,.18);
+    }
+    .primary:hover{ background: #1d4ed8; }
+
+    .ghost:hover{
+      border-color: rgba(37,99,235,.35);
+      background: rgba(37,99,235,.06);
+    }
+
+    .result{
+      border: 1px dashed rgba(148,163,184,.9);
+      background: rgba(248,250,252,.9);
+      border-radius: var(--radius-sm);
+      padding: 12px 12px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .result .big{
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+
+    .result .sub{
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .error{
+      color: var(--danger);
+      font-size: 12px;
+      font-weight: 700;
+      min-height: 1.2em;
+    }
+
+    .hint{
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    footer{
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .kbd{
+      font-family: var(--mono);
+      font-size: 11px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 2px 6px;
+      border-radius: 8px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <h1>和暦 ⇄ 西暦 変換（昭和・平成・令和）</h1>
+        <p>範囲：1926〜2099年。上で和暦→西暦、下で西暦→和暦を変換できます。</p>
+      </div>
+      <div class="badge">入力後 <span class="kbd">Enter</span> でも変換できます</div>
+    </header>
+
+    <div class="grid">
+      <!-- 上：和暦→西暦 -->
+      <section class="card" aria-label="和暦から西暦へ変換">
+        <div class="cardHead">
+          <div class="label">
+            <span class="pill">上</span>
+            <h2>和暦 → 西暦</h2>
+          </div>
+        </div>
+
+        <div class="cardBody">
+          <div class="row">
+            <div class="field">
+              <label for="era">元号</label>
+              <select id="era">
+                <option value="reiwa">令和</option>
+                <option value="heisei">平成</option>
+                <option value="showa">昭和</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="warekiYear">年（1〜）</label>
+              <input id="warekiYear" type="number" inputmode="numeric" min="1" step="1" placeholder="例：6" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="btnWarekiToSeireki">変換</button>
+            <button class="ghost" id="btnWarekiClear" type="button">クリア</button>
+          </div>
+
+          <div class="error" id="errWareki" role="status" aria-live="polite"></div>
+
+          <div class="result" aria-label="和暦から西暦の結果">
+            <div class="big" id="outSeireki">—</div>
+            <div class="sub" id="outSeirekiSub">例：令和6年 → 2024年</div>
+          </div>
+
+          <div class="hint">
+            ※「元年」は <b>1</b> として入力してください。
+          </div>
+        </div>
+      </section>
+
+      <!-- 下：西暦→和暦 -->
+      <section class="card" aria-label="西暦から和暦へ変換">
+        <div class="cardHead">
+          <div class="label">
+            <span class="pill">下</span>
+            <h2>西暦 → 和暦</h2>
+          </div>
+        </div>
+
+        <div class="cardBody">
+          <div class="row">
+            <div class="field">
+              <label for="seirekiYear">西暦（1926〜2099）</label>
+              <input id="seirekiYear" type="number" inputmode="numeric" min="1926" max="2099" step="1" placeholder="例：2024" />
+            </div>
+
+            <div class="field">
+              <label>判定</label>
+              <div class="result" style="height: 100%; display:flex; flex-direction:column; justify-content:center;">
+                <div class="sub">昭和：1926〜1988 / 平成：1989〜2018 / 令和：2019〜2099</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="btnSeirekiToWareki">変換</button>
+            <button class="ghost" id="btnSeirekiClear" type="button">クリア</button>
+          </div>
+
+          <div class="error" id="errSeireki" role="status" aria-live="polite"></div>
+
+          <div class="result" aria-label="西暦から和暦の結果">
+            <div class="big" id="outWareki">—</div>
+            <div class="sub" id="outWarekiSub">例：2024年 → 令和6年</div>
+          </div>
+
+          <div class="hint">
+            ※年だけの簡易変換です（年月日までは扱いません）。
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      仕様：昭和=1926開始、平成=1989開始、令和=2019開始として年換算します（範囲外はエラー表示）。
+    </footer>
+  </div>
+
+  <script>
+    // 年範囲
+    const MIN_YEAR = 1926;
+    const MAX_YEAR = 2099;
+
+    // 元号定義（年のみ）
+    const ERAS = [
+      { key: "reiwa",  name: "令和", start: 2019, end: 2099 },
+      { key: "heisei", name: "平成", start: 1989, end: 2018 },
+      { key: "showa",  name: "昭和", start: 1926, end: 1988 },
+    ];
+
+    const $ = (id) => document.getElementById(id);
+
+    function clampInt(v){
+      if (v === "" || v === null || v === undefined) return null;
+      const n = Number(v);
+      if (!Number.isFinite(n)) return null;
+      return Math.trunc(n);
+    }
+
+    function setText(id, text){ $(id).textContent = text; }
+
+    function findEraByKey(key){ return ERAS.find(e => e.key === key); }
+
+    function warekiToSeireki(eraKey, warekiYear){
+      const era = findEraByKey(eraKey);
+      if (!era) return { ok:false, error:"元号が不正です。" };
+
+      const y = clampInt(warekiYear);
+      if (y === null) return { ok:false, error:"年を入力してください。" };
+      if (y < 1) return { ok:false, error:"年は1以上で入力してください（元年=1）。" };
+
+      const seireki = era.start + (y - 1);
+
+      if (seireki < MIN_YEAR || seireki > MAX_YEAR){
+        return { ok:false, error:`変換結果が範囲外です（${MIN_YEAR}〜${MAX_YEAR}）。` };
+      }
+      if (seireki > era.end){
+        return { ok:false, error:`その年は${era.name}の範囲外です（${era.start}〜${era.end}）。` };
+      }
+
+      return { ok:true, seireki, era, warekiYear: y };
+    }
+
+    function seirekiToWareki(seirekiYear){
+      const y = clampInt(seirekiYear);
+      if (y === null) return { ok:false, error:"西暦を入力してください。" };
+      if (y < MIN_YEAR || y > MAX_YEAR){
+        return { ok:false, error:`西暦は${MIN_YEAR}〜${MAX_YEAR}で入力してください。` };
+      }
+
+      const era = ERAS.find(e => y >= e.start && y <= e.end);
+      if (!era) return { ok:false, error:"対応する元号が見つかりません。" };
+
+      const wareki = (y - era.start) + 1;
+      return { ok:true, era, warekiYear: wareki, seirekiYear: y };
+    }
+
+    // --- 上：和暦→西暦 ---
+    function runWarekiToSeireki(){
+      setText("errWareki", "");
+      const eraKey = $("era").value;
+      const wy = $("warekiYear").value;
+
+      const r = warekiToSeireki(eraKey, wy);
+      if (!r.ok){
+        setText("errWareki", r.error);
+        setText("outSeireki", "—");
+        setText("outSeirekiSub", "入力内容を確認してください。");
+        return;
+      }
+
+      setText("outSeireki", `${r.seireki}年`);
+      setText("outSeirekiSub", `${r.era.name}${r.warekiYear}年 → ${r.seireki}年`);
+    }
+
+    function clearWareki(){
+      $("era").value = "reiwa";
+      $("warekiYear").value = "";
+      setText("errWareki", "");
+      setText("outSeireki", "—");
+      setText("outSeirekiSub", "例：令和6年 → 2024年");
+      $("warekiYear").focus();
+    }
+
+    $("btnWarekiToSeireki").addEventListener("click", runWarekiToSeireki);
+    $("btnWarekiClear").addEventListener("click", clearWareki);
+    $("warekiYear").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runWarekiToSeireki();
+    });
+    $("era").addEventListener("change", () => {
+      // 入力済みなら即更新
+      if ($("warekiYear").value !== "") runWarekiToSeireki();
+    });
+
+    // --- 下：西暦→和暦 ---
+    function runSeirekiToWareki(){
+      setText("errSeireki", "");
+      const sy = $("seirekiYear").value;
+
+      const r = seirekiToWareki(sy);
+      if (!r.ok){
+        setText("errSeireki", r.error);
+        setText("outWareki", "—");
+        setText("outWarekiSub", "入力内容を確認してください。");
+        return;
+      }
+
+      setText("outWareki", `${r.era.name}${r.warekiYear}年`);
+      setText("outWarekiSub", `${r.seirekiYear}年 → ${r.era.name}${r.warekiYear}年`);
+    }
+
+    function clearSeireki(){
+      $("seirekiYear").value = "";
+      setText("errSeireki", "");
+      setText("outWareki", "—");
+      setText("outWarekiSub", "例：2024年 → 令和6年");
+      $("seirekiYear").focus();
+    }
+
+    $("btnSeirekiToWareki").addEventListener("click", runSeirekiToWareki);
+    $("btnSeirekiClear").addEventListener("click", clearSeireki);
+    $("seirekiYear").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runSeirekiToWareki();
+    });
+
+    // 初期フォーカス
+    $("warekiYear").focus();
+  </script>
+</body>
+</html>
