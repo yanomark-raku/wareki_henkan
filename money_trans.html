@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金額変換ツール</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #007bbb;
+            --bg-color: #f4f7f6;
+            --box-bg: #ffffff;
+            --border-color: #e0e0e0;
+            --hover-color: #006494;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--box-bg);
+            padding: 40px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 450px;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 30px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        /* 1つ目：入力エリア */
+        label {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-sizing: border-box;
+            background-color: #fafafa;
+            transition: all 0.3s ease;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 187, 0.1);
+        }
+
+        /* 2つ目：ボタン群 */
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            padding: 15px 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--accent-color);
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: var(--hover-color);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* 3つ目：結果表示エリア */
+        .result-box {
+            background-color: #f0f8fc;
+            padding: 25px 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #d4ebf8;
+        }
+
+        .result-label {
+            font-size: 0.9rem;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .result-value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            word-break: break-all;
+        }
+
+        .unit {
+            font-size: 1.2rem;
+            margin-left: 4px;
+            font-weight: normal;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>金額変換ツール</h1>
+    
+    <!-- 1つ目：金額を入力するところ -->
+    <div class="section">
+        <label for="amountInput">金額を入力してください</label>
+        <input type="number" id="amountInput" placeholder="例: 10000" min="0">
+        <div id="errorMsg" class="error-message">数値を正しく入力してください。</div>
+    </div>
+
+    <!-- 2つ目：変換するためのボタン群 -->
+    <div class="section button-group">
+        <button onclick="calculate('tax-in')">税抜 → 税込</button>
+        <button onclick="calculate('tax-out')">税込 → 税抜</button>
+        <button onclick="calculate('yearly')">月額 → 年額</button>
+        <button onclick="calculate('monthly')">年額 → 月額</button>
+    </div>
+
+    <!-- 3つ目：変換した後の金額を表示するところ -->
+    <div class="section result-box">
+        <div class="result-label">変換結果</div>
+        <div class="result-value" id="resultValue">0<span class="unit">円</span></div>
+    </div>
+</div>
+
+<script>
+    function calculate(type) {
+        const inputElement = document.getElementById('amountInput');
+        const resultElement = document.getElementById('resultValue');
+        const errorElement = document.getElementById('errorMsg');
+        
+        const inputValue = parseFloat(inputElement.value);
+
+        // 未入力や数値以外が入力された場合のエラーハンドリング
+        if (isNaN(inputValue)) {
+            errorElement.style.display = 'block';
+            resultElement.innerHTML = '0<span class="unit">円</span>';
+            return;
+        } else {
+            errorElement.style.display = 'none';
+        }
+
+        let result = 0;
+
+        switch(type) {
+            case 'tax-in':
+                // 入力金額に1.1をかける（※小数点対策として四捨五入しています）
+                result = Math.round(inputValue * 1.1);
+                break;
+            case 'tax-out':
+                // 入力金額を1.1で割る（小数点は四捨五入）
+                result = Math.round(inputValue / 1.1);
+                break;
+            case 'yearly':
+                // 入力金額に12をかける
+                result = inputValue * 12;
+                break;
+            case 'monthly':
+                // 入力金額を12で割る（小数点は四捨五入）
+                result = Math.round(inputValue / 12);
+                break;
+        }
+
+        // 視認性を高めるため、結果をカンマ区切り（例: 1,000円）で表示します
+        resultElement.innerHTML = result.toLocaleString('ja-JP') + '<span class="unit">円</span>';
+    }
+</script>
+
+</body>
+</html>
+
