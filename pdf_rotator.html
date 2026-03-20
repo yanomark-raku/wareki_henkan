@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Rotator - Simple & Clean</title>
+    
+    <!-- Google Fonts: Roboto -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Tailwind CSS (for layout utility) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF Libraries -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa; /* Google Light Gray Background */
+            color: #202124;
+        }
+
+        /* Material Design Buttons */
+        .btn {
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            border-radius: 4px;
+            letter-spacing: 0.25px;
+        }
+        
+        .btn-primary {
+            background-color: #1a73e8; /* Google Blue */
+            color: white;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+        }
+        .btn-primary:hover {
+            background-color: #1765cc;
+            box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+        }
+        .btn-primary:disabled {
+            background-color: #dadce0;
+            color: #9aa0a6;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .btn-text {
+            color: #1a73e8;
+            background-color: transparent;
+        }
+        .btn-text:hover {
+            background-color: rgba(26,115,232,0.04);
+        }
+
+        .btn-icon {
+            color: #5f6368;
+            border-radius: 50%;
+            padding: 8px;
+        }
+        .btn-icon:hover {
+            background-color: rgba(95,99,104,0.08);
+            color: #202124;
+        }
+
+        /* Card Styles */
+        .card {
+            background-color: white;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        .card:hover {
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed #dadce0;
+            border-radius: 8px;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .upload-area:hover, .upload-area.dragging {
+            border-color: #1a73e8;
+            background-color: #f1f3f4;
+        }
+
+        /* Page Thumbnail */
+        .page-preview {
+            position: relative;
+            background-color: #e8eaed;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page-preview canvas {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            max-width: 100%;
+            height: auto;
+            transition: transform 0.3s ease;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-left-color: #1a73e8;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Hide Scrollbar but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 h-16 flex items-center px-6 shrink-0 z-10 shadow-sm">
+        <span class="material-icons text-blue-600 mr-3" style="font-size: 28px;">picture_as_pdf</span>
+        <h1 class="text-xl font-normal text-gray-700 tracking-tight">PDF Rotator</h1>
+        <div class="ml-auto flex space-x-2">
+            <!-- Hidden Input -->
+            <input type="file" id="fileInput" accept="application/pdf" class="hidden">
+            <button onclick="document.getElementById('fileInput').click()" class="btn btn-primary px-4 py-2 text-sm">
+                <span class="material-icons text-sm mr-2">upload</span>
+                ファイルを選択
+            </button>
+            <button id="downloadBtn" onclick="downloadPdf()" class="btn btn-primary px-4 py-2 text-sm bg-green-600 hover:bg-green-700 hidden">
+                <span class="material-icons text-sm mr-2">download</span>
+                保存
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-auto bg-gray-50 relative">
+        
+        <!-- Empty State / Upload Prompt -->
+        <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-8">
+            <div onclick="document.getElementById('fileInput').click()" class="upload-area w-full max-w-2xl h-64 flex flex-col items-center justify-center cursor-pointer bg-white">
+                <span class="material-icons text-gray-400" style="font-size: 48px;">cloud_upload</span>
+                <p class="mt-4 text-gray-600 font-medium">PDFファイルをここにドロップ</p>
+                <p class="mt-1 text-gray-400 text-sm">またはクリックして選択</p>
+            </div>
+        </div>
+
+        <!-- Editor View (Hidden initially) -->
+        <div id="editorView" class="hidden container mx-auto p-6 max-w-6xl">
+            
+            <!-- Global Toolbar -->
+            <div class="sticky top-0 z-20 bg-gray-50/95 backdrop-blur-sm py-4 mb-4 flex items-center justify-between border-b border-gray-200">
+                <div class="text-gray-600 font-medium flex items-center">
+                    <span id="pageCount" class="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs mr-2">0 ページ</span>
+                    <span id="fileName" class="truncate max-w-xs">filename.pdf</span>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="rotateAll(-90)" class="btn bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 text-sm">
+                        <span class="material-icons text-base mr-1">rotate_left</span> すべて左へ
+                    </button>
+                    <button onclick="rotateAll(90)" class="btn bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 text-sm">
+                        <span class="material-icons text-base mr-1">rotate_right</span> すべて右へ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid of Pages -->
+            <div id="pagesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-20">
+                <!-- Pages will be injected here -->
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loader" class="hidden absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+            <div class="spinner mb-4"></div>
+            <p class="text-gray-500 font-medium">PDFを処理中...</p>
+        </div>
+
+    </main>
+
+    <script>
+        // Setup PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let currentFile = null;
+        let pdfDoc = null; // pdf-lib document
+        let originalPdfBytes = null;
+        let pageRotations = []; // Store rotation angle for each page (0, 90, 180, 270)
+        let totalPages = 0;
+
+        const fileInput = document.getElementById('fileInput');
+        const emptyState = document.getElementById('emptyState');
+        const editorView = document.getElementById('editorView');
+        const pagesGrid = document.getElementById('pagesGrid');
+        const loader = document.getElementById('loader');
+        const fileNameEl = document.getElementById('fileName');
+        const pageCountEl = document.getElementById('pageCount');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Drag and Drop Logic
+        const dropZone = document.querySelector('.upload-area');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) { dropZone.classList.add('dragging'); }
+        function unhighlight(e) { dropZone.classList.remove('dragging'); }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        fileInput.addEventListener('change', function(e) {
+            handleFiles(this.files);
+        });
+
+        function handleFiles(files) {
+            if (files.length > 0 && files[0].type === 'application/pdf') {
+                currentFile = files[0];
+                loadPDF(currentFile);
+            } else {
+                alert('PDFファイルを選択してください。');
+            }
+        }
+
+        async function loadPDF(file) {
+            showLoader(true);
+            fileNameEl.textContent = file.name;
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                originalPdfBytes = arrayBuffer;
+
+                // Load into PDF Lib (for saving logic later)
+                // We don't modify this object directly until save, we just track rotations state
+                // Actually, to get page count we can use pdf.js
+                
+                // Load for rendering (PDF.js)
+                const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+                const pdf = await loadingTask.promise;
+                
+                totalPages = pdf.numPages;
+                pageCountEl.textContent = `${totalPages} ページ`;
+                
+                // Reset rotations
+                pageRotations = new Array(totalPages).fill(0);
+
+                // Clear Grid
+                pagesGrid.innerHTML = '';
+                
+                // Switch View
+                emptyState.classList.add('hidden');
+                editorView.classList.remove('hidden');
+                downloadBtn.classList.remove('hidden');
+
+                // Render Pages
+                for (let i = 1; i <= totalPages; i++) {
+                    await renderPage(pdf, i);
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert('PDFの読み込みに失敗しました。');
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        async function renderPage(pdf, pageNum) {
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 0.5 }); // Thumbnail scale
+
+            // Create Card Element
+            const card = document.createElement('div');
+            card.className = 'card flex flex-col relative group';
+            card.innerHTML = `
+                <div class="p-3 border-b border-gray-100 flex justify-between items-center bg-white">
+                    <span class="text-xs font-bold text-gray-500">Page ${pageNum}</span>
+                    <div class="flex space-x-1">
+                        <button onclick="rotatePage(${pageNum - 1}, -90)" class="btn-icon p-1" title="左へ回転">
+                            <span class="material-icons text-lg">rotate_left</span>
+                        </button>
+                        <button onclick="rotatePage(${pageNum - 1}, 90)" class="btn-icon p-1" title="右へ回転">
+                            <span class="material-icons text-lg">rotate_right</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="page-preview p-4 overflow-hidden bg-gray-100 flex-1">
+                    <canvas id="canvas-page-${pageNum}"></canvas>
+                </div>
+            `;
+            pagesGrid.appendChild(card);
+
+            // Render to Canvas
+            const canvas = card.querySelector(`canvas`);
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            
+            await page.render(renderContext).promise;
+            
+            // Store initial dimensions for rotation logic later if needed, 
+            // but for CSS rotation, standard canvas is fine.
+        }
+
+        // Rotate Single Page
+        window.rotatePage = function(pageIndex, angle) {
+            // Update state
+            pageRotations[pageIndex] = (pageRotations[pageIndex] + angle) % 360;
+            if (pageRotations[pageIndex] < 0) pageRotations[pageIndex] += 360;
+
+            // Update UI (Visual only via CSS)
+            const canvas = document.getElementById(`canvas-page-${pageIndex + 1}`);
+            if (canvas) {
+                // Apply rotation
+                canvas.style.transform = `rotate(${pageRotations[pageIndex]}deg)`;
+                
+                // Adjust margin/scaling if 90/270 degrees to prevent overlap if aspect ratio is drastic?
+                // For simplicity in this grid view, simple rotation is usually sufficient 
+                // as the container has overflow-hidden or enough padding.
+                // A strictly correct implementation would resize the canvas container, 
+                // but CSS transform is instant and "good enough" for previews.
+                
+                // Optional: Swap width/height visuals for perfect fit? 
+                // Complexity vs Utility. Let's stick to CSS transform for smoothness.
+            }
+        };
+
+        // Rotate All Pages
+        window.rotateAll = function(angle) {
+            for (let i = 0; i < totalPages; i++) {
+                rotatePage(i, angle);
+            }
+        };
+
+        // Download Logic
+        window.downloadPdf = async function() {
+            if (!originalPdfBytes) return;
+            showLoader(true);
+
+            try {
+                // Load the original PDF into pdf-lib
+                const pdfDoc = await PDFLib.PDFDocument.load(originalPdfBytes);
+                const pages = pdfDoc.getPages();
+
+                // Apply rotations
+                for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const rotation = pageRotations[i];
+                    
+                    // pdf-lib rotation is additive to existing rotation, or set absolute?
+                    // .setRotation sets the absolute rotation.
+                    // We need to know the original rotation to add to it, OR just assume 
+                    // the user sees what they get. 
+                    // Usually better to get existing rotation and add ours.
+                    
+                    const currentRotation = page.getRotation().angle;
+                    page.setRotation(currentRotation + rotation);
+                }
+
+                // Save
+                const pdfBytes = await pdfDoc.save();
+                
+                // Trigger Download
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `rotated_${currentFile.name}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+            } catch (err) {
+                console.error(err);
+                alert('保存中にエラーが発生しました。');
+            } finally {
+                showLoader(false);
+            }
+        };
+
+        function showLoader(show) {
+            if (show) loader.classList.remove('hidden');
+            else loader.classList.add('hidden');
+        }
+
+    </script>
+</body>
+</html>
