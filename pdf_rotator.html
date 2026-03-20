@@ -43,20 +43,6 @@
             background-color: #1765cc;
             box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
         }
-        .btn-primary:disabled {
-            background-color: #dadce0;
-            color: #9aa0a6;
-            box-shadow: none;
-            cursor: not-allowed;
-        }
-
-        .btn-text {
-            color: #1a73e8;
-            background-color: transparent;
-        }
-        .btn-text:hover {
-            background-color: rgba(26,115,232,0.04);
-        }
 
         .btn-icon {
             color: #5f6368;
@@ -118,14 +104,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Hide Scrollbar but keep functionality */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
@@ -141,10 +119,18 @@
                 <span class="material-icons text-sm mr-2">upload</span>
                 ファイルを選択
             </button>
-            <button id="downloadBtn" onclick="downloadPdf()" class="btn btn-primary px-4 py-2 text-sm bg-green-600 hover:bg-green-700 hidden">
-                <span class="material-icons text-sm mr-2">download</span>
-                保存
-            </button>
+            
+            <!-- 保存ボタングループ（ファイル読み込み後に表示） -->
+            <div id="saveActionGroup" class="hidden flex space-x-2">
+                <button onclick="downloadPdf(false)" class="btn btn-primary px-4 py-2 text-sm bg-green-600 hover:bg-green-700" title="元のファイル名でダウンロードします">
+                    <span class="material-icons text-sm mr-1">save</span>
+                    上書き保存
+                </button>
+                <button onclick="downloadPdf(true)" class="btn btn-primary px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700" title="名前を付けてダウンロードします">
+                    <span class="material-icons text-sm mr-1">save_as</span>
+                    別名保存
+                </button>
+            </div>
         </div>
     </header>
 
@@ -188,20 +174,26 @@
         <!-- Loading Overlay -->
         <div id="loader" class="hidden absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
             <div class="spinner mb-4"></div>
-            <p class="text-gray-500 font-medium">PDFを処理中...</p>
+            <p class="text-gray-500 font-medium">処理中...</p>
         </div>
 
     </main>
+
+    <!-- トースト通知 (保存完了メッセージ) -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-gray-800 text-white px-5 py-3 rounded shadow-lg transform transition-all duration-300 translate-y-20 opacity-0 z-50 flex items-center">
+        <span class="material-icons mr-2 text-green-400">check_circle</span>
+        <span id="toastMsg" class="text-sm font-medium">保存が完了しました。</span>
+    </div>
 
     <script>
         // Setup PDF.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let currentFile = null;
-        let pdfDoc = null; // pdf-lib document
         let originalPdfBytes = null;
-        let pageRotations = []; // Store rotation angle for each page (0, 90, 180, 270)
+        let pageRotations = []; 
         let totalPages = 0;
+        let toastTimeout = null;
 
         const fileInput = document.getElementById('fileInput');
         const emptyState = document.getElementById('emptyState');
@@ -210,7 +202,7 @@
         const loader = document.getElementById('loader');
         const fileNameEl = document.getElementById('fileName');
         const pageCountEl = document.getElementById('pageCount');
-        const downloadBtn = document.getElementById('downloadBtn');
+        const saveActionGroup = document.getElementById('saveActionGroup');
 
         // Drag and Drop Logic
         const dropZone = document.querySelector('.upload-area');
@@ -219,18 +211,10 @@
             dropZone.addEventListener(eventName, preventDefaults, false);
         });
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, highlight, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, unhighlight, false);
-        });
+        ['dragenter', 'dragover'].forEach(eventName => { dropZone.addEventListener(eventName, highlight, false); });
+        ['dragleave', 'drop'].forEach(eventName => { dropZone.addEventListener(eventName, unhighlight, false); });
 
         function highlight(e) { dropZone.classList.add('dragging'); }
         function unhighlight(e) { dropZone.classList.remove('dragging'); }
@@ -239,8 +223,7 @@
 
         function handleDrop(e) {
             const dt = e.dataTransfer;
-            const files = dt.files;
-            handleFiles(files);
+            handleFiles(dt.files);
         }
 
         fileInput.addEventListener('change', function(e) {
@@ -264,29 +247,19 @@
                 const arrayBuffer = await file.arrayBuffer();
                 originalPdfBytes = arrayBuffer;
 
-                // Load into PDF Lib (for saving logic later)
-                // We don't modify this object directly until save, we just track rotations state
-                // Actually, to get page count we can use pdf.js
-                
-                // Load for rendering (PDF.js)
-                const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+                const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
                 const pdf = await loadingTask.promise;
                 
                 totalPages = pdf.numPages;
                 pageCountEl.textContent = `${totalPages} ページ`;
                 
-                // Reset rotations
                 pageRotations = new Array(totalPages).fill(0);
-
-                // Clear Grid
                 pagesGrid.innerHTML = '';
                 
-                // Switch View
                 emptyState.classList.add('hidden');
                 editorView.classList.remove('hidden');
-                downloadBtn.classList.remove('hidden');
+                saveActionGroup.classList.remove('hidden');
 
-                // Render Pages
                 for (let i = 1; i <= totalPages; i++) {
                     await renderPage(pdf, i);
                 }
@@ -301,9 +274,8 @@
 
         async function renderPage(pdf, pageNum) {
             const page = await pdf.getPage(pageNum);
-            const viewport = page.getViewport({ scale: 0.5 }); // Thumbnail scale
+            const viewport = page.getViewport({ scale: 0.5 }); 
 
-            // Create Card Element
             const card = document.createElement('div');
             card.className = 'card flex flex-col relative group';
             card.innerHTML = `
@@ -324,89 +296,96 @@
             `;
             pagesGrid.appendChild(card);
 
-            // Render to Canvas
             const canvas = card.querySelector(`canvas`);
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
 
-            const renderContext = {
-                canvasContext: context,
-                viewport: viewport
-            };
-            
+            const renderContext = { canvasContext: context, viewport: viewport };
             await page.render(renderContext).promise;
-            
-            // Store initial dimensions for rotation logic later if needed, 
-            // but for CSS rotation, standard canvas is fine.
         }
 
-        // Rotate Single Page
         window.rotatePage = function(pageIndex, angle) {
-            // Update state
             pageRotations[pageIndex] = (pageRotations[pageIndex] + angle) % 360;
             if (pageRotations[pageIndex] < 0) pageRotations[pageIndex] += 360;
 
-            // Update UI (Visual only via CSS)
             const canvas = document.getElementById(`canvas-page-${pageIndex + 1}`);
             if (canvas) {
-                // Apply rotation
                 canvas.style.transform = `rotate(${pageRotations[pageIndex]}deg)`;
-                
-                // Adjust margin/scaling if 90/270 degrees to prevent overlap if aspect ratio is drastic?
-                // For simplicity in this grid view, simple rotation is usually sufficient 
-                // as the container has overflow-hidden or enough padding.
-                // A strictly correct implementation would resize the canvas container, 
-                // but CSS transform is instant and "good enough" for previews.
-                
-                // Optional: Swap width/height visuals for perfect fit? 
-                // Complexity vs Utility. Let's stick to CSS transform for smoothness.
             }
         };
 
-        // Rotate All Pages
         window.rotateAll = function(angle) {
             for (let i = 0; i < totalPages; i++) {
                 rotatePage(i, angle);
             }
         };
 
-        // Download Logic
-        window.downloadPdf = async function() {
+        // トーストメッセージを表示する関数
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            
+            toastMsg.textContent = message;
+            
+            // アニメーションで表示
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            // 既存のタイマーがあればクリア
+            if (toastTimeout) clearTimeout(toastTimeout);
+            
+            // 3秒後に非表示
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // isSaveAs フラグで動作を切り替え
+        window.downloadPdf = async function(isSaveAs = false) {
             if (!originalPdfBytes) return;
+            
+            let exportFileName = currentFile.name;
+
+            // 別名保存の場合はプロンプトを表示
+            if (isSaveAs) {
+                const baseName = currentFile.name.replace(/\.pdf$/i, '');
+                const inputName = prompt('保存するファイル名を入力してください', baseName);
+                
+                // キャンセルされた場合は処理を中断
+                if (inputName === null) return; 
+                
+                // 拡張子の補完
+                exportFileName = inputName.trim();
+                if (!exportFileName.toLowerCase().endsWith('.pdf')) {
+                    exportFileName += '.pdf';
+                }
+            }
+
             showLoader(true);
 
             try {
-                // Load the original PDF into pdf-lib
                 const pdfDoc = await PDFLib.PDFDocument.load(originalPdfBytes);
                 const pages = pdfDoc.getPages();
 
-                // Apply rotations
                 for (let i = 0; i < pages.length; i++) {
                     const page = pages[i];
                     const rotation = pageRotations[i];
-                    
-                    // pdf-lib rotation is additive to existing rotation, or set absolute?
-                    // .setRotation sets the absolute rotation.
-                    // We need to know the original rotation to add to it, OR just assume 
-                    // the user sees what they get. 
-                    // Usually better to get existing rotation and add ours.
-                    
                     const currentRotation = page.getRotation().angle;
-                    page.setRotation(currentRotation + rotation);
+                    page.setRotation(PDFLib.degrees(currentRotation + rotation));
                 }
 
-                // Save
                 const pdfBytes = await pdfDoc.save();
                 
-                // Trigger Download
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `rotated_${currentFile.name}`;
+                link.download = exportFileName;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+
+                // 保存完了メッセージの表示
+                showToast(`「${exportFileName}」を保存しました`);
 
             } catch (err) {
                 console.error(err);
