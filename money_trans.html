@@ -58,7 +58,8 @@
             color: #555;
         }
 
-        input[type="number"] {
+        /* type="text"に変更したためのスタイル調整 */
+        input[type="text"] {
             width: 100%;
             padding: 15px;
             font-size: 1.2rem;
@@ -67,9 +68,10 @@
             box-sizing: border-box;
             background-color: #fafafa;
             transition: all 0.3s ease;
+            text-align: right; /* 金額なので右寄せの方が見やすいように変更 */
         }
 
-        input[type="number"]:focus {
+        input[type="text"]:focus {
             outline: none;
             border-color: var(--accent-color);
             background-color: #fff;
@@ -148,7 +150,8 @@
     <!-- 1つ目：金額を入力するところ -->
     <div class="section">
         <label for="amountInput">金額を入力してください</label>
-        <input type="number" id="amountInput" placeholder="例: 10000" min="0">
+        <!-- type="text"にし、スマホでテンキーが出るようにinputmode="numeric"を指定 -->
+        <input type="text" id="amountInput" inputmode="numeric" placeholder="例: 10,000">
         <div id="errorMsg" class="error-message">数値を正しく入力してください。</div>
     </div>
 
@@ -168,14 +171,33 @@
 </div>
 
 <script>
+    // 入力時に自動でカンマを付ける処理
+    const amountInput = document.getElementById('amountInput');
+    
+    amountInput.addEventListener('input', function(e) {
+        // 入力された値から、数字以外の文字（カンマなど）を一旦すべて取り除く
+        let value = e.target.value.replace(/[^0-9]/g, '');
+        
+        // 数字が入力されていれば、カンマ付きにフォーマットし直す
+        if (value !== '') {
+            value = parseInt(value, 10).toLocaleString('ja-JP');
+        }
+        
+        // フォーマットした値を入力欄に戻す
+        e.target.value = value;
+    });
+
+    // 変換の計算処理
     function calculate(type) {
         const inputElement = document.getElementById('amountInput');
         const resultElement = document.getElementById('resultValue');
         const errorElement = document.getElementById('errorMsg');
         
-        const inputValue = parseFloat(inputElement.value);
+        // 計算の前に、入力された文字列からカンマを取り除いて数値に変換する
+        const rawValue = inputElement.value.replace(/,/g, '');
+        const inputValue = parseFloat(rawValue);
 
-        // 未入力や数値以外が入力された場合のエラーハンドリング
+        // 未入力や数値以外（空文字など）の場合のエラーハンドリング
         if (isNaN(inputValue)) {
             errorElement.style.display = 'block';
             resultElement.innerHTML = '0<span class="unit">円</span>';
@@ -188,11 +210,11 @@
 
         switch(type) {
             case 'tax-in':
-                // 入力金額に1.1をかける（※小数点対策として四捨五入しています）
+                // 入力金額に1.1をかける（四捨五入）
                 result = Math.round(inputValue * 1.1);
                 break;
             case 'tax-out':
-                // 入力金額を1.1で割る（小数点は四捨五入）
+                // 入力金額を1.1で割る（四捨五入）
                 result = Math.round(inputValue / 1.1);
                 break;
             case 'yearly':
@@ -200,16 +222,15 @@
                 result = inputValue * 12;
                 break;
             case 'monthly':
-                // 入力金額を12で割る（小数点は四捨五入）
+                // 入力金額を12で割る（四捨五入）
                 result = Math.round(inputValue / 12);
                 break;
         }
 
-        // 視認性を高めるため、結果をカンマ区切り（例: 1,000円）で表示します
+        // 結果をカンマ区切りで表示
         resultElement.innerHTML = result.toLocaleString('ja-JP') + '<span class="unit">円</span>';
     }
 </script>
 
 </body>
 </html>
-
